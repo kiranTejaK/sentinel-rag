@@ -1,0 +1,65 @@
+# SentinelRAG Autonomous Coding Directives
+# Target Runtime: Python 3.11+ | FastAPI ASGI | SQLAlchemy 2.0 Async | Redis 7 | PostgreSQL 16 pgvector
+
+[CORE PRINCIPLES]
+1. ZERO FRAMEWORK BLOAT:
+   - Absolutely NO LangChain, NO LlamaIndex, NO CrewAI, NO AutoGen.
+   - All RAG pipelines, prompt templates, vector similarity search, and rank fusion logic MUST be written in clean, idiomatic, typed Python using raw asyncpg/SQLAlchemy and native LiteLLM.
+
+2. PYTHON RUNTIME & STANDARDS:
+   - Python 3.11+ strictly. Use modern syntax: `X | Y` for unions, `match/case`, `async with`, `TaskGroup`.
+   - Strict Type Hinting: Every function and method signature must have full type annotations (`def func(param: str) -> Coroutine[Any, Any, Result]:`). Use `typing` and Pydantic v2 models.
+   - Zero `Any` types where a concrete Generic, Protocol, or TypedDict can be defined.
+
+3. CONFIGURATION & STATE:
+   - All settings MUST inherit from `pydantic_settings.BaseSettings` with `SettingsConfigDict(env_file=".env", extra="ignore")`.
+   - Never hardcode API keys, hostnames, ports, or credentials. Use strongly-typed environment models.
+
+4. DATABASE & PERSISTENCE:
+   - Async SQLAlchemy 2.0+ with `asyncpg` driver only. Never use synchronous database calls or `psycopg2`.
+   - Use declarative mappings with `Mapped[...]` and `mapped_column(...)`.
+   - pgvector queries must utilize native SQL functions or SQLAlchemy vector operators (`<=>` for cosine distance).
+   - All database sessions must be managed through FastAPI dependency injection with `async with async_session_factory() as session:`.
+
+5. REDIS & CACHING:
+   - Use `redis.asyncio` exclusively.
+   - All rate limiting operations MUST be executed via atomic Lua scripts to guarantee thread and cluster safety.
+   - Semantic cache entries must store raw embeddings as binary buffers or float arrays along with structured JSON strings for cached outputs.
+
+6. LOGGING & OBSERVABILITY:
+   - ZERO RAW `print()` STATEMENTS. Any occurrence of `print()` is a build-breaking violation.
+   - Use `structlog` exclusively. Every log entry must be structured JSON containing contextual metadata (`request_id`, `tenant_id`, `latency_ms`, `event`).
+   - Prometheus metrics must use standard naming conventions:
+     - Counters: `sentinel_requests_total`, `sentinel_cache_hits_total`, `sentinel_rate_limit_exceeded_total`
+     - Histograms: `sentinel_request_duration_seconds`, `sentinel_retrieval_duration_seconds`
+
+7. ERROR HANDLING & API CONTRACTS:
+   - All HTTP error responses must adhere strictly to RFC 7807 (Problem Details for HTTP APIs):
+     ```json
+     {
+       "type": "https://sentinelrag.io/errors/rate-limit-exceeded",
+       "title": "Too Many Requests",
+       "status": 429,
+       "detail": "Rate limit quota exceeded. Retry after 1420ms.",
+       "instance": "/v1/chat/completions",
+       "request_id": "req_01j9a87z...",
+       "invalid_params": []
+     }
+     ```
+   - Never leak internal stack traces or database schema errors to client responses.
+
+8. LLM ROUTING & RESILIENCE:
+   - Use `litellm.acompletion` for upstream model calls.
+   - Wrap provider invocations with `tenacity` retry loops for transient network errors.
+   - Implement an in-memory or Redis-backed sliding-window Circuit Breaker with states: `CLOSED`, `OPEN`, `HALF-OPEN`. If a provider fails $N$ consecutive times, trip circuit immediately to secondary fallback without waiting for timeouts.
+
+9. TESTING & CODE QUALITY:
+   - All asynchronous tests must use `pytest` and `pytest-asyncio` with `asyncio_mode = "auto"`.
+   - Ruff for linting and formatting. Line length: 100 characters.
+
+10. DAILY LOGS & INTERVIEW PREPARATION STANDARDS:
+   - STRICTLY NO DSA / LeetCode exercises in daily logs.
+   - Every daily log MUST contain an exhaustive, topic-wise Technical Interview Questionnaire (not just 2-3 questions).
+   - Questions must cover systems architecture, Python/ASGI concurrency internals, networking/protocols, database/vector engines, distributed caching/Redis, and security/resilience.
+   - Questions must deliberately go beyond the project's superficial scope to probe real-world production failure modes, low-level OS/network mechanics, and engineering trade-offs.
+

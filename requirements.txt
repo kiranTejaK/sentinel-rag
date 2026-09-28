@@ -1,0 +1,3 @@
+# DEPRECATED: SentinelRAG utilizes Astral's uv for dependency resolution.
+# Refer to pyproject.toml and uv.lock.
+# To sync environment: uv sync
