@@ -1,6 +1,8 @@
 from typing import Any
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
+
 from app.core.logging import logger
 
 
@@ -24,7 +26,9 @@ class ProblemDetailException(Exception):
 
 
 class RateLimitExceededException(ProblemDetailException):
-    def __init__(self, detail: str = "Tenant token-bucket rate limit exceeded.", retry_after_ms: int = 1000):
+    def __init__(
+        self, detail: str = "Tenant token-bucket rate limit exceeded.", retry_after_ms: int = 1000
+    ):
         super().__init__(
             status=429,
             title="Too Many Requests",

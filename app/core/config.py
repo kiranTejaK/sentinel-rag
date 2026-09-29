@@ -1,4 +1,5 @@
 from typing import Literal
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -36,8 +37,12 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://sentinel:sentinel_secret@localhost:5432/sentinel_db",
         description="Asyncpg database connection string",
     )
-    DB_POOL_SIZE: int = Field(default=20, ge=5, le=100, description="Max steady-state connection pool size")
-    DB_MAX_OVERFLOW: int = Field(default=10, ge=0, le=50, description="Max burst connection overflow")
+    DB_POOL_SIZE: int = Field(
+        default=20, ge=5, le=100, description="Max steady-state connection pool size"
+    )
+    DB_MAX_OVERFLOW: int = Field(
+        default=10, ge=0, le=50, description="Max burst connection overflow"
+    )
     DB_TIMEOUT_SECONDS: int = Field(default=30, ge=1, le=120, description="Query execution timeout")
 
     # Redis Settings (Semantic Cache & Rate Limiting)
@@ -45,8 +50,12 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         description="Redis connection URL",
     )
-    REDIS_POOL_SIZE: int = Field(default=50, ge=10, le=200, description="Redis connection pool limit")
-    REDIS_TIMEOUT_MS: int = Field(default=500, ge=50, le=5000, description="Redis network timeout in ms")
+    REDIS_POOL_SIZE: int = Field(
+        default=50, ge=10, le=200, description="Redis connection pool limit"
+    )
+    REDIS_TIMEOUT_MS: int = Field(
+        default=500, ge=50, le=5000, description="Redis network timeout in ms"
+    )
 
     # Semantic Cache Configuration
     SEMANTIC_CACHE_THRESHOLD: float = Field(
@@ -55,11 +64,17 @@ class Settings(BaseSettings):
     SEMANTIC_CACHE_TTL_SECONDS: int = Field(
         default=86400, ge=60, description="Default TTL for cached generations (24h)"
     )
-    EMBEDDING_MODEL: str = Field(default="text-embedding-3-small", description="Embedding model name")
-    EMBEDDING_DIMENSION: int = Field(default=1536, ge=128, le=4096, description="Embedding vector size")
+    EMBEDDING_MODEL: str = Field(
+        default="text-embedding-3-small", description="Embedding model name"
+    )
+    EMBEDDING_DIMENSION: int = Field(
+        default=1536, ge=128, le=4096, description="Embedding vector size"
+    )
 
     # Rate Limiting Defaults
-    RATE_LIMIT_DEFAULT_CAPACITY: int = Field(default=100, ge=1, description="Burst bucket token capacity")
+    RATE_LIMIT_DEFAULT_CAPACITY: int = Field(
+        default=100, ge=1, description="Burst bucket token capacity"
+    )
     RATE_LIMIT_DEFAULT_REFILL_RATE_PER_SEC: int = Field(
         default=10, ge=1, description="Refill tokens per second"
     )

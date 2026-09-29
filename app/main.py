@@ -1,12 +1,14 @@
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.v1 import api_v1_router
 from app.core.config import settings
 from app.core.database import db_manager
 from app.core.exceptions import (
@@ -79,6 +81,9 @@ app.add_middleware(
 
 # Exception handlers
 app.add_exception_handler(ProblemDetailException, problem_detail_exception_handler)  # type: ignore[arg-type]
+
+# API Routers
+app.include_router(api_v1_router)
 
 
 @app.middleware("http")

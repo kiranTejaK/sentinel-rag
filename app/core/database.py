@@ -1,20 +1,17 @@
 import time
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
+
 from app.core.config import settings
 from app.core.logging import logger
-
-
-class Base(DeclarativeBase):
-    """SQLAlchemy 2.0 Base Class."""
-    pass
+from app.db.session import async_session_factory as db_session_factory
+from app.db.session import engine as db_engine
 
 
 class DatabaseManager:
@@ -32,28 +29,14 @@ class DatabaseManager:
             pool_size=settings.DB_POOL_SIZE,
             max_overflow=settings.DB_MAX_OVERFLOW,
         )
-        self.engine = create_async_engine(
-            settings.DATABASE_URL,
-            echo=False,
-            pool_size=settings.DB_POOL_SIZE,
-            max_overflow=settings.DB_MAX_OVERFLOW,
-            pool_timeout=settings.DB_TIMEOUT_SECONDS,
-            pool_pre_ping=True,  # Test connection liveness before checking out
-        )
-        self.session_factory = async_sessionmaker(
-            bind=self.engine,
-            class_=AsyncSession,
-            expire_on_commit=False,
-            autoflush=False,
-        )
+        self.engine = db_engine
+        self.session_factory = db_session_factory
 
     async def close(self) -> None:
         """Gracefully closes all pool connections."""
         if self.engine:
             logger.info("closing_database_pool")
             await self.engine.dispose()
-            self.engine = None
-            self.session_factory = None
 
     async def ping(self) -> tuple[bool, float]:
         """Executes a lightweight query to test connectivity and measure latency."""

@@ -1,6 +1,8 @@
 import logging
 import sys
+
 import structlog
+
 from app.core.config import settings
 
 
@@ -27,7 +29,8 @@ def setup_logging() -> None:
         renderer = structlog.processors.JSONRenderer()
 
     structlog.configure(
-        processors=shared_processors + [
+        processors=shared_processors
+        + [
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
