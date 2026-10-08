@@ -16,6 +16,7 @@ from app.core.exceptions import (
     problem_detail_exception_handler,
 )
 from app.core.logging import logger, setup_logging
+from app.core.rate_limiter import TokenBucketRateLimitMiddleware
 from app.core.redis import redis_manager
 
 
@@ -64,6 +65,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Distributed Token-Bucket Rate Limiting
+app.add_middleware(
+    TokenBucketRateLimitMiddleware,
+    redis_getter=lambda: redis_manager.client,
+    capacity=settings.RATE_LIMIT_DEFAULT_CAPACITY,
+    refill_rate_per_sec=settings.RATE_LIMIT_DEFAULT_REFILL_RATE_PER_SEC,
+)
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
@@ -76,8 +85,12 @@ app.add_middleware(
         "X-Sentinel-Latency-Ms",
         "X-Sentinel-Provider",
         "X-Request-Id",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "Retry-After",
     ],
 )
+
 
 # Exception handlers
 app.add_exception_handler(ProblemDetailException, problem_detail_exception_handler)  # type: ignore[arg-type]

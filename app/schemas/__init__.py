@@ -1,5 +1,13 @@
 """SentinelRAG Pydantic Schemas Registry."""
 
+from app.schemas.cache import (
+    CacheEvaluateRequest,
+    CacheEvaluateResponse,
+    CacheInvalidateRequest,
+    CacheInvalidateResponse,
+    CacheSetRequest,
+    CacheSetResponse,
+)
 from app.schemas.document import (
     BatchIngestRequest,
     BatchIngestResponse,
@@ -15,9 +23,16 @@ from app.schemas.search import (
 __all__ = [
     "BatchIngestRequest",
     "BatchIngestResponse",
+    "CacheEvaluateRequest",
+    "CacheEvaluateResponse",
+    "CacheInvalidateRequest",
+    "CacheInvalidateResponse",
+    "CacheSetRequest",
+    "CacheSetResponse",
     "ChunkCreate",
     "ChunkResponse",
     "HybridSearchRequest",
     "HybridSearchResponse",
     "HybridSearchResultItem",
 ]
+
