@@ -81,26 +81,27 @@ class Settings(BaseSettings):
 
     # LLM Router Defaults (LiteLLM)
     DEFAULT_PRIMARY_MODEL: str = Field(
-        default="openai/gpt-4o-mini", description="Primary upstream model identifier"
+        default="groq/llama-3.3-70b-versatile", description="Primary upstream model identifier (ultra-low latency)"
     )
     DEFAULT_FALLBACK_MODEL_1: str = Field(
-        default="anthropic/claude-3-5-sonnet-20241022", description="Secondary fallback model"
+        default="openai/gpt-4o-mini", description="Secondary fallback model"
     )
     DEFAULT_FALLBACK_MODEL_2: str = Field(
-        default="groq/llama-3.3-70b-versatile", description="Tertiary open-weights model"
+        default="mistral/mistral-small-latest", description="Tertiary fallback model"
     )
 
     # Provider API Keys
     OPENAI_API_KEY: str | None = Field(default=None, description="OpenAI API Key")
     ANTHROPIC_API_KEY: str | None = Field(default=None, description="Anthropic API Key")
     GROQ_API_KEY: str | None = Field(default=None, description="Groq API Key")
+    MISTRAL_API_KEY: str | None = Field(default=None, description="Mistral API Key")
 
     # Circuit Breaker Config
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
-        default=3, ge=1, le=10, description="Consecutive errors to trip breaker"
+        default=5, ge=1, le=10, description="Consecutive errors to trip breaker (5 consecutive failures)"
     )
     CIRCUIT_BREAKER_RECOVERY_TIME_SECONDS: int = Field(
-        default=30, ge=5, le=300, description="Cool-down duration before half-open probe"
+        default=60, ge=5, le=300, description="Cool-down duration before half-open probe (60s recovery)"
     )
     CIRCUIT_BREAKER_TIMEOUT_SECONDS: float = Field(
         default=4.0, ge=0.5, le=60.0, description="Single LLM request timeout"

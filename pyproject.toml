@@ -21,6 +21,7 @@ dependencies = [
     "prometheus-client>=0.20.0",
     "tenacity>=8.5.0",
     "litellm>=1.44.0",
+    "tiktoken>=0.7.0",
     "alembic>=1.13.2",
     "greenlet>=3.0.3",
 ]
