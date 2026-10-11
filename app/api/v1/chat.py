@@ -15,8 +15,15 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import structlog
+
 from app.core.logging import logger
 from app.core.redis import get_redis_client
+from app.core.telemetry import (
+    CACHE_OPERATIONS_TOTAL,
+    COST_SAVED_USD_TOTAL,
+    TOKENS_CONSUMED_TOTAL,
+)
 from app.db.session import get_async_session
 from app.repositories.search import SearchRepository
 from app.schemas.chat import (
@@ -55,6 +62,7 @@ async def chat_completions(
     payload: ChatCompletionRequest,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     redis: Annotated[aioredis.Redis, Depends(get_redis_client)],
+    router_service: Annotated[ResilientLLMRouter, Depends(get_llm_router)],
 ) -> ChatCompletionResponse:
     """Unified endpoint tying together Cache -> Hybrid Search -> LLM Router -> Telemetry."""
     start_time = time.perf_counter()
@@ -62,11 +70,17 @@ async def chat_completions(
     created_epoch = int(time.time())
 
     cache_service = RedisSemanticCache(redis)
-    router_service: ResilientLLMRouter = get_llm_router(redis)
 
     # Extract primary user query text
     user_messages = [m for m in payload.messages if m.role == "user"]
     query_text = user_messages[-1].content if user_messages else ""
+
+    # Bind initial request context
+    structlog.contextvars.bind_contextvars(
+        tenant_id=payload.tenant_id,
+        use_cache=payload.use_cache,
+        use_retrieval=payload.use_retrieval,
+    )
 
     # --------------------------------------------------------------------------
     # STAGE 1: SUB-20ms SEMANTIC & EXACT CACHE CHECK
@@ -80,6 +94,9 @@ async def chat_completions(
 
         if cache_result.status == "CACHE_HIT" and cache_result.cached_response:
             latency_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+
+            # Record Prometheus metrics for cache hit
+            CACHE_OPERATIONS_TOTAL.labels(result="hit", tenant=payload.tenant_id).inc()
 
             # Compute tokens and dollars saved
             prompt_tokens = count_messages_tokens(
@@ -99,6 +116,17 @@ async def chat_completions(
                 tenant_id=payload.tenant_id
             )
 
+            # Record dollars saved in Prometheus
+            if dollars_saved > 0:
+                COST_SAVED_USD_TOTAL.labels(tenant=payload.tenant_id).inc(dollars_saved)
+
+            # Bind telemetry to structlog context
+            structlog.contextvars.bind_contextvars(
+                cache_hit=True,
+                execution_latency_ms=latency_ms,
+                dollars_saved=dollars_saved,
+            )
+
             logger.info(
                 "chat_completion_served_from_cache",
                 tenant_id=payload.tenant_id,
@@ -107,6 +135,7 @@ async def chat_completions(
                 similarity=cache_result.similarity,
                 dollars_saved=dollars_saved,
                 latency_ms=latency_ms,
+                cache_hit=True,
             )
 
             return ChatCompletionResponse(
@@ -233,11 +262,42 @@ async def chat_completions(
         except Exception as cache_err:
             logger.warning("cache_write_failed_continuing", error=str(cache_err))
 
+    # Record cache miss in Prometheus if cache was checked
+    if payload.use_cache:
+        CACHE_OPERATIONS_TOTAL.labels(result="miss", tenant=payload.tenant_id).inc()
+
+    # Record token usage in Prometheus
+    TOKENS_CONSUMED_TOTAL.labels(
+        tenant=payload.tenant_id, model=router_result.model_used
+    ).inc(router_result.total_tokens)
+
     # Calculate cumulative metrics for telemetry response
     cumulative_saved = await router_service.analytics.get_cumulative_dollars_saved(
         tenant_id=payload.tenant_id
     )
     total_latency_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+
+    # Bind request completion context to structlog
+    structlog.contextvars.bind_contextvars(
+        cache_hit=False,
+        provider=router_result.provider,
+        model=router_result.model_used,
+        total_tokens=router_result.total_tokens,
+        execution_latency_ms=total_latency_ms,
+        cost_usd=router_result.cost_usd,
+    )
+
+    logger.info(
+        "chat_completion_generation_success",
+        tenant_id=payload.tenant_id,
+        model=router_result.model_used,
+        provider=router_result.provider,
+        total_tokens=router_result.total_tokens,
+        cost_usd=router_result.cost_usd,
+        latency_ms=total_latency_ms,
+        cache_hit=False,
+        fallback_triggered=router_result.fallback_triggered,
+    )
 
     return ChatCompletionResponse(
         id=completion_id,

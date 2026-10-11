@@ -21,11 +21,10 @@ def setup_logging() -> None:
         structlog.processors.UnicodeDecoder(),
     ]
 
+    # In production, use JSONRenderer. In development, use JSON if requested or console
     if settings.ENVIRONMENT == "development" and settings.DEBUG:
-        # Development readable console logs
         renderer = structlog.dev.ConsoleRenderer()
     else:
-        # Production machine-parsable JSON
         renderer = structlog.processors.JSONRenderer()
 
     structlog.configure(

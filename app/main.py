@@ -8,6 +8,8 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+import structlog
+
 from app.api.v1 import api_v1_router
 from app.core.config import settings
 from app.core.database import db_manager
@@ -18,6 +20,7 @@ from app.core.exceptions import (
 from app.core.logging import logger, setup_logging
 from app.core.rate_limiter import TokenBucketRateLimitMiddleware
 from app.core.redis import redis_manager
+from app.core.telemetry import HTTP_REQUEST_DURATION_SECONDS, metrics_response
 
 
 @asynccontextmanager
@@ -99,20 +102,54 @@ app.add_exception_handler(ProblemDetailException, problem_detail_exception_handl
 app.include_router(api_v1_router)
 
 
+# Prometheus Telemetry & Correlation Middleware
 @app.middleware("http")
 async def correlation_id_and_timing_middleware(request: Request, call_next: Any) -> Response:
-    """Injects unique request correlation ID and measures request lifecycle latency."""
+    """Injects unique request correlation ID, binds structlog context, and measures request lifecycle latency."""
     request_id = request.headers.get("X-Request-Id") or f"req_{uuid.uuid4().hex[:16]}"
     request.state.request_id = request_id
 
+    # Bind request-scoped context to structlog contextvars
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        request_id=request_id,
+        route=request.url.path,
+        method=request.method,
+    )
+
     start_time = time.perf_counter()
-    response = await call_next(request)
-    duration_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+    try:
+        response = await call_next(request)
+    except Exception:
+        # Measure duration on unhandled exceptions
+        duration_sec = time.perf_counter() - start_time
+        endpoint = request.url.path
+        HTTP_REQUEST_DURATION_SECONDS.labels(endpoint=endpoint, status="500").observe(duration_sec)
+        raise
+
+    duration_sec = time.perf_counter() - start_time
+    duration_ms = round(duration_sec * 1000.0, 2)
 
     response.headers["X-Request-Id"] = request_id
     response.headers["X-Sentinel-Latency-Ms"] = str(duration_ms)
 
+    # Observe Prometheus histogram duration partitioned by endpoint and status
+    endpoint = request.url.path
+    status_str = str(response.status_code)
+    HTTP_REQUEST_DURATION_SECONDS.labels(endpoint=endpoint, status=status_str).observe(duration_sec)
+
     return response
+
+
+@app.get(
+    "/metrics",
+    tags=["Diagnostics"],
+    summary="Prometheus Telemetry Metrics Endpoint",
+    response_description="Exposes Prometheus operational metrics for scraping",
+)
+async def get_metrics() -> Response:
+    """Prometheus metrics endpoint returning scrape telemetry in standard text exposition format."""
+    return metrics_response()
 
 
 @app.get(

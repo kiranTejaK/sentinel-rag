@@ -127,6 +127,7 @@ async def test_chat_completions_cache_miss_routes_to_llm() -> None:
             payload = {
                 "messages": [{"role": "user", "content": "Tell me about circuit breakers."}],
                 "tenant_id": "tenant_b",
+                "model": "groq/llama-3.3-70b-versatile",
                 "use_cache": True,
                 "use_retrieval": False,
                 "query_vector": [0.05] * 1536,

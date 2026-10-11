@@ -332,7 +332,7 @@ class ResilientLLMRouter:
 _global_router: ResilientLLMRouter | None = None
 
 
-def get_llm_router(redis_client: aioredis.Redis | None = None) -> ResilientLLMRouter:
+def get_llm_router(redis_client: Any = None) -> ResilientLLMRouter:
     """Returns singleton ResilientLLMRouter instance to maintain circuit breaker state."""
     global _global_router
     if _global_router is None:
