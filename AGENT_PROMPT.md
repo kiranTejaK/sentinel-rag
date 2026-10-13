@@ -14,6 +14,7 @@ You are an expert Principal AI Infrastructure & Systems Engineer acting on behal
 Every message, debug note, exception, or informational trace MUST be emitted via `structlog`:
 ```python
 import structlog
+
 logger = structlog.get_logger(__name__)
 
 # Correct:
@@ -27,6 +28,7 @@ print(f"Cache hit: {distance}")
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -47,8 +49,10 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from pgvector.sqlalchemy import Vector
 import uuid
 
+
 class Base(DeclarativeBase):
     pass
+
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
@@ -66,12 +70,14 @@ Return structured problem details for all HTTP exceptions:
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+
 class ProblemDetailException(Exception):
     def __init__(self, status: int, title: str, detail: str, type_uri: str = "about:blank"):
         self.status = status
         self.title = title
         self.detail = detail
         self.type_uri = type_uri
+
 
 async def problem_detail_handler(request: Request, exc: ProblemDetailException):
     return JSONResponse(
@@ -82,9 +88,9 @@ async def problem_detail_handler(request: Request, exc: ProblemDetailException):
             "status": exc.status,
             "detail": exc.detail,
             "instance": request.url.path,
-            "request_id": getattr(request.state, "request_id", None)
+            "request_id": getattr(request.state, "request_id", None),
         },
-        headers={"Content-Type": "application/problem+json"}
+        headers={"Content-Type": "application/problem+json"},
     )
 ```
 

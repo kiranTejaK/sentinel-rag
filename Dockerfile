@@ -49,8 +49,10 @@ RUN groupadd -g 10001 appgroup && \
 # Copy isolated virtual environment prepared by uv from builder stage
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 
-# Copy application source code with non-root ownership
+# Copy application source code and migrations with non-root ownership
 COPY --chown=appuser:appgroup app /app/app
+COPY --chown=appuser:appgroup alembic /app/alembic
+COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini
 
 # Set runtime environment variables
 ENV PATH="/app/.venv/bin:$PATH" \

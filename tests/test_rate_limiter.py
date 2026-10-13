@@ -18,13 +18,19 @@ class FakeRateLimitRedis:
     async def script_load(self, script: str) -> str:
         return "mock_sha_123"
 
-    async def evalsha(self, sha: str, numkeys: int, key: str, capacity_s: str, refill_s: str, req_s: str) -> list:
+    async def evalsha(
+        self, sha: str, numkeys: int, key: str, capacity_s: str, refill_s: str, req_s: str
+    ) -> list:
         return self._execute_token_bucket(key, float(capacity_s), float(refill_s), float(req_s))
 
-    async def eval(self, script: str, numkeys: int, key: str, capacity_s: str, refill_s: str, req_s: str) -> list:
+    async def eval(
+        self, script: str, numkeys: int, key: str, capacity_s: str, refill_s: str, req_s: str
+    ) -> list:
         return self._execute_token_bucket(key, float(capacity_s), float(refill_s), float(req_s))
 
-    def _execute_token_bucket(self, key: str, capacity: float, refill_rate: float, requested: float) -> list:
+    def _execute_token_bucket(
+        self, key: str, capacity: float, refill_rate: float, requested: float
+    ) -> list:
         now = self.simulated_time
         if key not in self.buckets:
             tokens = capacity
@@ -74,7 +80,9 @@ async def test_token_bucket_limiter_depletion_and_refill() -> None:
 
     # Simulate 2 seconds elapsed
     fake_redis.simulated_time += 2.0
-    res_after_refill = await limiter.check(identifier, capacity=5, refill_rate_per_sec=1.0, requested=1)
+    res_after_refill = await limiter.check(
+        identifier, capacity=5, refill_rate_per_sec=1.0, requested=1
+    )
     assert res_after_refill.allowed is True
     assert res_after_refill.remaining == 1  # refilled 2, consumed 1
 
@@ -106,5 +114,7 @@ async def test_rate_limiting_middleware_headers_and_rejection() -> None:
 
         # Non-exempt endpoint: test with evaluate or root
         # Let's hit /api/v1/cache/evaluate or test rate limiting directly on middleware
-        res = await TokenBucketLimiter(fake_redis).check("key:test_api_key_abc123", capacity=3, refill_rate_per_sec=1.0)  # type: ignore[arg-type]
+        res = await TokenBucketLimiter(fake_redis).check(
+            "key:test_api_key_abc123", capacity=3, refill_rate_per_sec=1.0
+        )  # type: ignore[arg-type]
         assert res.allowed is True

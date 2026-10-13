@@ -340,4 +340,3 @@ def get_llm_router(redis_client: Any = None) -> ResilientLLMRouter:
     elif redis_client is not None and _global_router.analytics.redis is None:
         _global_router.analytics.redis = redis_client
     return _global_router
-

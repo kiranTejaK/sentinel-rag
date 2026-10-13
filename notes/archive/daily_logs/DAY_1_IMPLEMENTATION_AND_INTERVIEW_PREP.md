@@ -160,7 +160,7 @@ During a high-concurrency stress test, an engineer introduced a synchronous clie
       conn = await conn_pool.acquire()
       # If cancelled here while awaiting long query...
       data = await conn.fetch("SELECT * FROM large_table")
-      await conn_pool.release(conn) # NEVER REACHED! Connection leaked!
+      await conn_pool.release(conn)  # NEVER REACHED! Connection leaked!
   ```
   If `CancelledError` strikes during the `fetch()` await, execution jumps directly out of the coroutine, bypassing the release call. Over time, the database connection pool is completely drained of available connections, causing total application deadlocks.
 - **Defensive Production Architecture:**
@@ -251,8 +251,7 @@ I implemented a dual-stage Docker architecture:
 - **ASGI Specification (Asynchronous Server Gateway Interface):**
   ASGI models a web application as a single asynchronous callable taking three parameters:
   ```python
-  async def asgi_app(scope: dict, receive: Callable, send: Callable) -> None:
-      ...
+  async def asgi_app(scope: dict, receive: Callable, send: Callable) -> None: ...
   ```
   1. **`scope`:** A dictionary containing connection metadata (HTTP method, headers, client IP, path, protocol version). It persists for the entire connection lifespan.
   2. **`receive`:** An `async` callable that yields incoming event dictionaries (e.g., `{"type": "http.request", "body": b"...", "more_body": True}`).

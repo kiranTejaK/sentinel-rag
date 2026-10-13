@@ -65,9 +65,7 @@ def count_text_tokens(text: str, model_name: str = "gpt-4o-mini") -> int:
     return len(tokenizer.encode(text))
 
 
-def count_messages_tokens(
-    messages: list[dict[str, Any]], model_name: str = "gpt-4o-mini"
-) -> int:
+def count_messages_tokens(messages: list[dict[str, Any]], model_name: str = "gpt-4o-mini") -> int:
     """Computes standard chat message format token count including chat markup overhead."""
     tokenizer = get_tokenizer_for_model(model_name)
     num_tokens = 0
@@ -82,9 +80,7 @@ def count_messages_tokens(
     return num_tokens
 
 
-def calculate_request_cost(
-    model_name: str, prompt_tokens: int, completion_tokens: int
-) -> float:
+def calculate_request_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
     """Calculates total dollar cost for a completion request."""
     rates = get_model_rates(model_name)
     prompt_cost = (prompt_tokens / 1_000_000.0) * rates["prompt"]

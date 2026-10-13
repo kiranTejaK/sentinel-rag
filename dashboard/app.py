@@ -9,6 +9,7 @@ Real-time telemetry showcase:
 """
 
 import time
+
 import requests
 import streamlit as st
 
@@ -128,7 +129,11 @@ with col_m1:
 with col_m2:
     total_ops = st.session_state.cache_hits + st.session_state.cache_misses
     hit_rate = (st.session_state.cache_hits / total_ops * 100.0) if total_ops > 0 else 0.0
-    st.metric(label="Semantic Cache Hit Rate", value=f"{hit_rate:.1f}%", delta=f"{st.session_state.cache_hits} Hits")
+    st.metric(
+        label="Semantic Cache Hit Rate",
+        value=f"{hit_rate:.1f}%",
+        delta=f"{st.session_state.cache_hits} Hits",
+    )
 with col_m3:
     st.metric(label="Active Upstream Model", value=selected_model.split("/")[0].upper())
 with col_m4:
@@ -158,7 +163,9 @@ with col_chat:
         if st.button("Sample 3: Rate Limiting"):
             user_query = "Simulate rate limit stress with repeated calls."
 
-    submit_query = st.button("🚀 Dispatch Request to Gateway", type="primary", use_container_width=True)
+    submit_query = st.button(
+        "🚀 Dispatch Request to Gateway", type="primary", use_container_width=True
+    )
 
     if submit_query and user_query:
         req_payload = {
@@ -200,9 +207,13 @@ with col_chat:
                     else:
                         st.session_state.cache_misses += 1
 
-                    st.success(f"Response Received in {wall_latency:.1f}ms (Gateway Latency: {telemetry.get('latency_ms', 0):.1f}ms)")
+                    st.success(
+                        f"Response Received in {wall_latency:.1f}ms (Gateway Latency: {telemetry.get('latency_ms', 0):.1f}ms)"
+                    )
                 elif resp.status_code == 429:
-                    st.error(f"HTTP 429 Too Many Requests! Rate Limiter Breached. Retry-After: {resp.headers.get('Retry-After', 'N/A')}s")
+                    st.error(
+                        f"HTTP 429 Too Many Requests! Rate Limiter Breached. Retry-After: {resp.headers.get('Retry-After', 'N/A')}s"
+                    )
                     st.session_state.last_response = None
                 else:
                     st.error(f"Error {resp.status_code}: {resp.text}")
@@ -294,9 +305,17 @@ with col_telemetry:
             llm_lat = max(0.0, total_lat - cache_lat - db_lat)
 
         st.markdown("#### ⏱️ Latency Stage Breakdown")
-        st.progress(min(1.0, cache_lat / (total_lat or 1.0)), text=f"Redis Semantic Cache: {cache_lat:.1f}ms")
-        st.progress(min(1.0, db_lat / (total_lat or 1.0)), text=f"PostgreSQL Hybrid Search (HNSW + FTS): {db_lat:.1f}ms")
-        st.progress(min(1.0, llm_lat / (total_lat or 1.0)), text=f"LLM Upstream Generation: {llm_lat:.1f}ms")
+        st.progress(
+            min(1.0, cache_lat / (total_lat or 1.0)),
+            text=f"Redis Semantic Cache: {cache_lat:.1f}ms",
+        )
+        st.progress(
+            min(1.0, db_lat / (total_lat or 1.0)),
+            text=f"PostgreSQL Hybrid Search (HNSW + FTS): {db_lat:.1f}ms",
+        )
+        st.progress(
+            min(1.0, llm_lat / (total_lat or 1.0)), text=f"LLM Upstream Generation: {llm_lat:.1f}ms"
+        )
 
         st.markdown("#### 💰 Cost & Token Telemetry")
         t_col1, t_col2 = st.columns(2)
@@ -341,4 +360,6 @@ with col_telemetry:
         st.info("Awaiting query execution to stream real-time latency and token metrics.")
 
 st.divider()
-st.caption("SentinelRAG Platform & Observability Engineering | Prometheus: `:8000/metrics` | OpenAPI: `:8000/docs`")
+st.caption(
+    "SentinelRAG Platform & Observability Engineering | Prometheus: `:8000/metrics` | OpenAPI: `:8000/docs`"
+)

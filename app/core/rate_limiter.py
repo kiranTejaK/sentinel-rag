@@ -168,7 +168,6 @@ class TokenBucketLimiter:
             )
 
 
-
 class TokenBucketRateLimitMiddleware(BaseHTTPMiddleware):
     """Custom FastAPI/Starlette middleware enforcing distributed Token-Bucket rate limiting.
 
@@ -197,7 +196,6 @@ class TokenBucketRateLimitMiddleware(BaseHTTPMiddleware):
         self.limiter = TokenBucketLimiter(redis_client=redis_client, redis_getter=redis_getter)
         self.capacity = capacity
         self.refill_rate_per_sec = refill_rate_per_sec
-
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path

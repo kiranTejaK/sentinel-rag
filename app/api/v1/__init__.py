@@ -14,4 +14,3 @@ api_v1_router.include_router(cache_router)
 api_v1_router.include_router(chat_router)
 
 __all__ = ["api_v1_router"]
-

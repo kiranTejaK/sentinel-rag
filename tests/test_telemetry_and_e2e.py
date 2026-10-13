@@ -80,26 +80,33 @@ async def test_full_cache_miss_hybrid_search_llm_cycle() -> None:
         embedding=[0.02] * 1536,
     )
 
-    dense_candidates = [DenseCandidate(chunk=test_chunk, distance=0.05, similarity_score=0.95, rank=1)]
+    dense_candidates = [
+        DenseCandidate(chunk=test_chunk, distance=0.05, similarity_score=0.95, rank=1)
+    ]
     sparse_candidates = [SparseCandidate(chunk=test_chunk, lexical_score=0.88, rank=1)]
 
     generated_text = "SentinelRAG successfully combined pgvector and tsvector via RRF."
     mock_resp = _build_mock_llm_response(generated_text, model="groq/llama-3.3-70b-versatile")
 
     try:
-        with patch(
-            "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
-            new_callable=AsyncMock,
-        ) as mock_lookup, patch(
-            "app.api.v1.chat.SearchRepository.search_hybrid_candidates",
-            new_callable=AsyncMock,
-        ) as mock_search, patch(
-            "litellm.acompletion",
-            new_callable=AsyncMock,
-        ) as mock_llm, patch(
-            "app.api.v1.chat.RedisSemanticCache.set",
-            new_callable=AsyncMock,
-        ) as mock_cache_set:
+        with (
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
+                new_callable=AsyncMock,
+            ) as mock_lookup,
+            patch(
+                "app.api.v1.chat.SearchRepository.search_hybrid_candidates",
+                new_callable=AsyncMock,
+            ) as mock_search,
+            patch(
+                "litellm.acompletion",
+                new_callable=AsyncMock,
+            ) as mock_llm,
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.set",
+                new_callable=AsyncMock,
+            ) as mock_cache_set,
+        ):
             mock_lookup.return_value = cache_miss
             mock_search.return_value = (dense_candidates, sparse_candidates)
             mock_llm.return_value = mock_resp
@@ -156,13 +163,16 @@ async def test_cache_hit_returns_payload_under_25ms() -> None:
     )
 
     try:
-        with patch(
-            "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
-            new_callable=AsyncMock,
-        ) as mock_lookup, patch(
-            "litellm.acompletion",
-            new_callable=AsyncMock,
-        ) as mock_llm:
+        with (
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
+                new_callable=AsyncMock,
+            ) as mock_lookup,
+            patch(
+                "litellm.acompletion",
+                new_callable=AsyncMock,
+            ) as mock_llm,
+        ):
             mock_lookup.return_value = cached_lookup
 
             payload = {
@@ -174,9 +184,7 @@ async def test_cache_hit_returns_payload_under_25ms() -> None:
 
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-                t_start = time.perf_counter()
                 response = await client.post("/api/v1/chat/completions", json=payload)
-                elapsed_ms = (time.perf_counter() - t_start) * 1000.0
 
             assert response.status_code == 200
             data = response.json()
@@ -261,25 +269,42 @@ async def test_mocked_primary_failure_triggers_circuit_breaker_and_fallback() ->
     app.dependency_overrides[get_llm_router] = lambda: test_router
 
     try:
-        with patch(
-            "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
-            new_callable=AsyncMock,
-        ) as mock_lookup, patch(
-            "litellm.acompletion",
-            new_callable=AsyncMock,
-        ) as mock_llm:
+        with (
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
+                new_callable=AsyncMock,
+            ) as mock_lookup,
+            patch(
+                "litellm.acompletion",
+                new_callable=AsyncMock,
+            ) as mock_llm,
+        ):
             mock_lookup.return_value = cache_miss
 
             # Primary attempts 3 retries (all 503), then 4th call is fallback (OpenAI)
             mock_llm.side_effect = [
-                ServiceUnavailableError("Groq 503 Service Unavailable 1", model="groq/llama-3.3-70b-versatile", llm_provider="groq"),
-                ServiceUnavailableError("Groq 503 Service Unavailable 2", model="groq/llama-3.3-70b-versatile", llm_provider="groq"),
-                ServiceUnavailableError("Groq 503 Service Unavailable 3", model="groq/llama-3.3-70b-versatile", llm_provider="groq"),
+                ServiceUnavailableError(
+                    "Groq 503 Service Unavailable 1",
+                    model="groq/llama-3.3-70b-versatile",
+                    llm_provider="groq",
+                ),
+                ServiceUnavailableError(
+                    "Groq 503 Service Unavailable 2",
+                    model="groq/llama-3.3-70b-versatile",
+                    llm_provider="groq",
+                ),
+                ServiceUnavailableError(
+                    "Groq 503 Service Unavailable 3",
+                    model="groq/llama-3.3-70b-versatile",
+                    llm_provider="groq",
+                ),
                 mock_fallback_resp,
             ]
 
             payload = {
-                "messages": [{"role": "user", "content": "Explain circuit breakers during outages."}],
+                "messages": [
+                    {"role": "user", "content": "Explain circuit breakers during outages."}
+                ],
                 "tenant_id": "tenant_resilience",
                 "model": "groq/llama-3.3-70b-versatile",
                 "use_cache": True,

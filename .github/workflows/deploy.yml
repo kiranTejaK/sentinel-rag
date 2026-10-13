@@ -1,0 +1,209 @@
+name: SentinelRAG CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  DOCKER_IMAGE_NAME: sentinelrag/gateway
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ============================================================================
+  # JOB 1: Code Quality, Linting & Automated Pytest Suite
+  # ============================================================================
+  test:
+    name: Lint & Automated Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: sentinel_secret
+          POSTGRES_DB: sentinel_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinel_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Astral uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run Ruff Linting
+        run: uv run ruff check .
+
+      - name: Run Ruff Formatting Check
+        run: uv run ruff format --check .
+
+      - name: Run Database Migrations Check
+        env:
+          DATABASE_URL: postgresql+asyncpg://sentinel:sentinel_secret@localhost:5432/sentinel_db
+        run: uv run alembic upgrade head
+
+      - name: Execute Full Pytest Test Suite
+        env:
+          ENVIRONMENT: test
+          LOG_LEVEL: INFO
+          DATABASE_URL: postgresql+asyncpg://sentinel:sentinel_secret@localhost:5432/sentinel_db
+          REDIS_URL: redis://localhost:6379/0
+          APP_SECRET: test-secret-key-must-be-at-least-32-bytes-long
+        run: uv run pytest --maxfail=1 --disable-warnings -v
+
+  # ============================================================================
+  # JOB 2: Build & Push Multi-Architecture Docker Image
+  # ============================================================================
+  build-and-push:
+    name: Build & Push Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (Multi-Arch Emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker Metadata (Tags & Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and Push Multi-Arch Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # JOB 3: Automated Zero-Downtime SSH Deployment to EC2 / VPS
+  # ============================================================================
+  deploy:
+    name: Deploy to EC2 / VPS via SSH
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Short Git Commit SHA
+        id: vars
+        run: echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Deploy via SSH Remote Execution
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_IMAGE_NAME: ${{ env.DOCKER_IMAGE_NAME }}
+          GIT_SHA: ${{ steps.vars.outputs.sha_short }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script_stop: true
+          envs: DOCKER_IMAGE_NAME,GIT_SHA
+          script: |
+            set -euo pipefail
+            APP_DIR="/opt/sentinel-rag"
+            echo "======================================================================"
+            echo "Starting SentinelRAG Continuous Deployment on Remote Host..."
+            echo "Target Image: ${DOCKER_IMAGE_NAME}:${GIT_SHA}"
+            echo "Timestamp: $(date -u)"
+            echo "======================================================================"
+
+            cd "${APP_DIR}"
+
+            # 1. Pull newest Docker container image from Docker Hub
+            echo "[1/4] Pulling production container image..."
+            docker pull "${DOCKER_IMAGE_NAME}:${GIT_SHA}"
+            docker tag "${DOCKER_IMAGE_NAME}:${GIT_SHA}" "${DOCKER_IMAGE_NAME}:latest"
+
+            # 2. Execute non-destructive Alembic database schema migrations
+            echo "[2/4] Executing non-destructive Alembic migrations..."
+            docker run --rm \
+              --network sentinel_prod_network \
+              --env-file .env.production \
+              "${DOCKER_IMAGE_NAME}:${GIT_SHA}" \
+              alembic upgrade head
+
+            # 3. Rolling update of API and dependent containers
+            echo "[3/4] Triggering rolling container update..."
+            DOCKER_IMAGE="${DOCKER_IMAGE_NAME}:${GIT_SHA}" docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # 4. Container Health Check Verification
+            echo "[4/4] Verifying production deployment health..."
+            HEALTHY=0
+            for i in $(seq 1 12); do
+              echo "Waiting for /healthz check (attempt $i/12)..."
+              if curl -s -f http://localhost:8000/healthz > /dev/null 2>&1 || curl -s -k -f https://localhost/healthz > /dev/null 2>&1; then
+                echo "Healthcheck passed! Service is live and operational."
+                HEALTHY=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "Healthcheck failed! Inspecting container logs:"
+              docker compose -f docker-compose.prod.yml logs --tail 50 api
+              exit 1
+            fi
+
+            # Prune dangling legacy images to prevent disk saturation
+            echo "Pruning dangling image layers..."
+            docker image prune -f
+
+            echo "======================================================================"
+            echo "Deployment Completed Successfully! SHA: ${GIT_SHA}"
+            echo "======================================================================"

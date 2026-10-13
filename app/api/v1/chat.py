@@ -12,10 +12,9 @@ import uuid
 from typing import Annotated
 
 import redis.asyncio as aioredis
+import structlog
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 from app.core.logging import logger
 from app.core.redis import get_redis_client
@@ -146,9 +145,7 @@ async def chat_completions(
                 choices=[
                     ChatCompletionChoice(
                         index=0,
-                        message=ChatMessage(
-                            role="assistant", content=cache_result.cached_response
-                        ),
+                        message=ChatMessage(role="assistant", content=cache_result.cached_response),
                         finish_reason="stop",
                     )
                 ],
@@ -267,9 +264,9 @@ async def chat_completions(
         CACHE_OPERATIONS_TOTAL.labels(result="miss", tenant=payload.tenant_id).inc()
 
     # Record token usage in Prometheus
-    TOKENS_CONSUMED_TOTAL.labels(
-        tenant=payload.tenant_id, model=router_result.model_used
-    ).inc(router_result.total_tokens)
+    TOKENS_CONSUMED_TOTAL.labels(tenant=payload.tenant_id, model=router_result.model_used).inc(
+        router_result.total_tokens
+    )
 
     # Calculate cumulative metrics for telemetry response
     cumulative_saved = await router_service.analytics.get_cumulative_dollars_saved(

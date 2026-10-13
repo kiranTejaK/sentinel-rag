@@ -308,7 +308,7 @@ Cumulative savings are persisted atomically in Redis via `INCRBYFLOAT analytics:
     async with db.transaction():
         chunks = await repo.search(...)
         # Holding DB connection open while waiting 5 seconds for LLM generation!
-        response = await llm.complete(...) 
+        response = await llm.complete(...)
         await repo.save_history(...)
     ```
   - If 50 users query simultaneously, 50 database connections are held idle waiting for external HTTP calls to OpenAI. The pool is instantly drained.

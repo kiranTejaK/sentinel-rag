@@ -81,7 +81,8 @@ class Settings(BaseSettings):
 
     # LLM Router Defaults (LiteLLM)
     DEFAULT_PRIMARY_MODEL: str = Field(
-        default="groq/llama-3.3-70b-versatile", description="Primary upstream model identifier (ultra-low latency)"
+        default="groq/llama-3.3-70b-versatile",
+        description="Primary upstream model identifier (ultra-low latency)",
     )
     DEFAULT_FALLBACK_MODEL_1: str = Field(
         default="openai/gpt-4o-mini", description="Secondary fallback model"
@@ -98,10 +99,16 @@ class Settings(BaseSettings):
 
     # Circuit Breaker Config
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
-        default=5, ge=1, le=10, description="Consecutive errors to trip breaker (5 consecutive failures)"
+        default=5,
+        ge=1,
+        le=10,
+        description="Consecutive errors to trip breaker (5 consecutive failures)",
     )
     CIRCUIT_BREAKER_RECOVERY_TIME_SECONDS: int = Field(
-        default=60, ge=5, le=300, description="Cool-down duration before half-open probe (60s recovery)"
+        default=60,
+        ge=5,
+        le=300,
+        description="Cool-down duration before half-open probe (60s recovery)",
     )
     CIRCUIT_BREAKER_TIMEOUT_SECONDS: float = Field(
         default=4.0, ge=0.5, le=60.0, description="Single LLM request timeout"

@@ -57,10 +57,13 @@ async def test_chat_completions_cache_hit_bypasses_llm() -> None:
     )
 
     try:
-        with patch(
-            "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
-            new_callable=AsyncMock,
-        ) as mock_get_or_lookup, patch("litellm.acompletion", new_callable=AsyncMock) as mock_llm:
+        with (
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
+                new_callable=AsyncMock,
+            ) as mock_get_or_lookup,
+            patch("litellm.acompletion", new_callable=AsyncMock) as mock_llm,
+        ):
             mock_get_or_lookup.return_value = cached_lookup
 
             payload = {
@@ -111,16 +114,20 @@ async def test_chat_completions_cache_miss_routes_to_llm() -> None:
     mock_resp = _mock_llm_response("Groq generated response about circuit breakers.")
 
     try:
-        with patch(
-            "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
-            new_callable=AsyncMock,
-        ) as mock_lookup, patch(
-            "app.api.v1.chat.RedisSemanticCache.set",
-            new_callable=AsyncMock,
-        ) as mock_set, patch(
-            "litellm.acompletion",
-            new_callable=AsyncMock,
-        ) as mock_llm:
+        with (
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
+                new_callable=AsyncMock,
+            ) as mock_lookup,
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.set",
+                new_callable=AsyncMock,
+            ) as mock_set,
+            patch(
+                "litellm.acompletion",
+                new_callable=AsyncMock,
+            ) as mock_llm,
+        ):
             mock_lookup.return_value = cache_miss
             mock_llm.return_value = mock_resp
 
@@ -143,7 +150,10 @@ async def test_chat_completions_cache_miss_routes_to_llm() -> None:
             assert data["telemetry"]["cache_hit"] is False
             assert data["telemetry"]["provider"] == "groq"
             assert data["telemetry"]["cost_usd"] > 0.0
-            assert data["choices"][0]["message"]["content"] == "Groq generated response about circuit breakers."
+            assert (
+                data["choices"][0]["message"]["content"]
+                == "Groq generated response about circuit breakers."
+            )
             assert mock_set.call_count == 1  # Stored to cache
 
     finally:
@@ -181,25 +191,33 @@ async def test_chat_completions_with_hybrid_retrieval() -> None:
 
     dense_candidates = [DenseCandidate(chunk=chunk_1, distance=0.1, similarity_score=0.9, rank=1)]
     sparse_candidates = [SparseCandidate(chunk=chunk_1, lexical_score=0.95, rank=1)]
-    mock_resp = _mock_llm_response("According to your architecture handbook, SentinelRAG uses pgvector.")
+    mock_resp = _mock_llm_response(
+        "According to your architecture handbook, SentinelRAG uses pgvector."
+    )
 
     try:
-        with patch(
-            "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
-            new_callable=AsyncMock,
-        ) as mock_lookup, patch(
-            "app.api.v1.chat.SearchRepository.search_hybrid_candidates",
-            new_callable=AsyncMock,
-        ) as mock_search, patch(
-            "litellm.acompletion",
-            new_callable=AsyncMock,
-        ) as mock_llm:
+        with (
+            patch(
+                "app.api.v1.chat.RedisSemanticCache.get_or_lookup",
+                new_callable=AsyncMock,
+            ) as mock_lookup,
+            patch(
+                "app.api.v1.chat.SearchRepository.search_hybrid_candidates",
+                new_callable=AsyncMock,
+            ) as mock_search,
+            patch(
+                "litellm.acompletion",
+                new_callable=AsyncMock,
+            ) as mock_llm,
+        ):
             mock_lookup.return_value = cache_miss
             mock_search.return_value = (dense_candidates, sparse_candidates)
             mock_llm.return_value = mock_resp
 
             payload = {
-                "messages": [{"role": "user", "content": "How does SentinelRAG retrieve documents?"}],
+                "messages": [
+                    {"role": "user", "content": "How does SentinelRAG retrieve documents?"}
+                ],
                 "tenant_id": "tenant_c",
                 "use_cache": True,
                 "use_retrieval": True,

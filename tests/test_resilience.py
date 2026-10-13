@@ -33,7 +33,9 @@ async def test_execute_with_resilience_succeeds_after_transient_retry() -> None:
         nonlocal call_count
         call_count += 1
         if call_count < 2:
-            raise RateLimitError("HTTP 429: Too Many Requests", model="llama-3", llm_provider="groq")
+            raise RateLimitError(
+                "HTTP 429: Too Many Requests", model="llama-3", llm_provider="groq"
+            )
         return "success_response"
 
     result = await execute_with_resilience(
@@ -54,8 +56,6 @@ async def test_execute_with_resilience_fails_fast_on_fatal_error() -> None:
         raise ValueError("Non-retryable invalid format")
 
     with pytest.raises(ValueError, match="Non-retryable invalid format"):
-        await execute_with_resilience(
-            fatal_call, max_attempts=3, multiplier=0.01, max_wait=0.05
-        )
+        await execute_with_resilience(fatal_call, max_attempts=3, multiplier=0.01, max_wait=0.05)
 
     assert call_count == 1

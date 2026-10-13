@@ -8,9 +8,7 @@ from pydantic import BaseModel, Field
 class ChatMessage(BaseModel):
     """Single message in a conversational thread."""
 
-    role: Literal["system", "user", "assistant"] = Field(
-        ..., description="Message author role"
-    )
+    role: Literal["system", "user", "assistant"] = Field(..., description="Message author role")
     content: str = Field(..., min_length=1, description="Message text payload")
 
 
@@ -26,9 +24,7 @@ class ChatCompletionRequest(BaseModel):
     model: str | None = Field(
         default=None, description="Explicit model selection; defaults to primary router model"
     )
-    temperature: float = Field(
-        default=0.7, ge=0.0, le=2.0, description="Sampling temperature"
-    )
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: int = Field(
         default=1024, ge=1, le=8192, description="Maximum completion tokens to generate"
     )
